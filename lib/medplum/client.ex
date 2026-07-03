@@ -179,7 +179,7 @@ defmodule Medplum.Client do
     end
   end
 
-  defp ensure_string!(value, key) when is_binary(value), do: value
+  defp ensure_string!(value, _key) when is_binary(value), do: value
 
   defp ensure_string!(_value, key) do
     raise ArgumentError, "#{inspect(key)} must be a string"
