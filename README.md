@@ -2,8 +2,6 @@
 
 A lightweight Elixir client for Medplum's FHIR API.
 
-**NOT LIVE YET**
-
 Features:
 
 - CRUD helpers for common FHIR resource operations
@@ -15,12 +13,24 @@ Features:
 
 ## Installation
 
-Add `medplum_elixir` to your dependencies:
+Add `medplum_elixir` to your dependencies.
+
+From Hex:
 
 ```elixir
 def deps do
   [
     {:medplum_elixir, "~> 0.1.0"}
+  ]
+end
+```
+
+From GitHub:
+
+```elixir
+def deps do
+  [
+    {:medplum_elixir, git: "https://github.com/CodeDuckers-LLC/medplum_elixir.git"}
   ]
 end
 ```
