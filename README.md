@@ -2,6 +2,8 @@
 
 A lightweight Elixir client for Medplum's FHIR API.
 
+**NOT LIVE YET**
+
 Features:
 
 - CRUD helpers for common FHIR resource operations
