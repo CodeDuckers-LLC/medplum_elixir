@@ -12,7 +12,7 @@ Features:
 - Stable `Medplum.Error` responses
 - Low-level authenticated `request/4`
 - JSON Patch support with `patch/4`
-- Paged search streaming with `stream_search/3`
+- Paged search streaming with `stream_search/3` 
 
 ## Installation
 
