@@ -37,7 +37,7 @@ defmodule MedplumElixir.MixProject do
   end
 
   defp description do
-    "A lightweight Elixir client for Medplum's FHIR API."
+    "Elixir client for Medplum's FHIR API with resource and workflow helpers."
   end
 
   defp package do
@@ -57,7 +57,19 @@ defmodule MedplumElixir.MixProject do
       main: "Medplum",
       source_ref: "v#{@version}",
       source_url: @source_url,
-      extras: ["README.md"]
+      extras: [
+        "README.md",
+        "guides/getting-started.md",
+        "guides/resource-and-workflow-helpers.md",
+        "CHANGELOG.md"
+      ],
+      groups_for_extras: [
+        Guides: [
+          "guides/getting-started.md",
+          "guides/resource-and-workflow-helpers.md"
+        ],
+        Meta: ["CHANGELOG.md"]
+      ]
     ]
   end
 end
