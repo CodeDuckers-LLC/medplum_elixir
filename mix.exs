@@ -43,6 +43,15 @@ defmodule MedplumElixir.MixProject do
   defp package do
     [
       name: "medplum_elixir",
+      files: [
+        "lib",
+        "guides",
+        "mix.exs",
+        "README.md",
+        "LICENSE",
+        "CHANGELOG.md",
+        ".formatter.exs"
+      ],
       licenses: ["MIT"],
       links: %{
         "GitHub" => @source_url,
