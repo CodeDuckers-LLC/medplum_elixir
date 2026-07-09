@@ -11,6 +11,11 @@ defmodule Medplum.Auth do
   Requests a bearer token for the given client using the client credentials grant.
   """
   @spec token(Client.t()) :: {:ok, String.t()} | {:error, Error.t()}
+  def token(%Client{auth_mode: :access_token, access_token: access_token})
+      when is_binary(access_token) do
+    {:ok, access_token}
+  end
+
   def token(%Client{} = client) do
     case TokenCache.get(client) do
       {:ok, token} ->

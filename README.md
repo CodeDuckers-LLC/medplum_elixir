@@ -5,11 +5,13 @@ Elixir client for Medplum's FHIR API.
 Built for apps that want:
 
 - direct CRUD on FHIR resources
+- first-class OAuth authorization-code helpers
 - resource-specific helpers under `Medplum.Resources.*`
 - workflow helpers under `Medplum.Workflows.*`
 - token reuse across requests
+- user-bearer-token authenticated requests
 - stable `{:error, %Medplum.Error{}}` returns
-- lower-level escape hatches for operations, batch, transaction, binary, upsert, GraphQL, and raw requests
+- lower-level escape hatches for operations, batch, transaction, binary, upsert, GraphQL, FHIR requests, and non-FHIR Medplum requests
 
 ## Installation
 
@@ -31,7 +33,9 @@ mix deps.get
 
 ## Quick start
 
-Medplum uses OAuth client credentials. Set env vars first:
+### Service app / backend
+
+For backend and server-to-server use, Medplum uses OAuth client credentials. Set env vars first:
 
 ```bash
 export MEDPLUM_BASE_URL="https://api.medplum.com"
@@ -78,13 +82,58 @@ entries =
   |> Enum.to_list()
 ```
 
+### User session / OAuth callback
+
+Build an authorization URL for the frontend login flow:
+
+```elixir
+authorize_url =
+  Medplum.authorize_url(
+    [
+      base_url: System.fetch_env!("MEDPLUM_BASE_URL"),
+      client_id: System.fetch_env!("MEDPLUM_CLIENT_ID"),
+      client_secret: System.fetch_env!("MEDPLUM_CLIENT_SECRET")
+    ],
+    redirect_uri: "https://myapp.example/auth/medplum/callback",
+    scope: "openid profile offline_access",
+    state: "csrf-token"
+  )
+```
+
+Exchange the callback code, then create a client that uses the returned user token directly:
+
+```elixir
+oauth_client =
+  Medplum.new(
+    base_url: System.fetch_env!("MEDPLUM_BASE_URL"),
+    client_id: System.fetch_env!("MEDPLUM_CLIENT_ID"),
+    client_secret: System.fetch_env!("MEDPLUM_CLIENT_SECRET")
+  )
+
+{:ok, token_response} =
+  Medplum.exchange_authorization_code(oauth_client, params["code"],
+    redirect_uri: "https://myapp.example/auth/medplum/callback"
+  )
+
+user_client =
+  Medplum.new_with_access_token(
+    [base_url: System.fetch_env!("MEDPLUM_BASE_URL")],
+    token_response["access_token"]
+  )
+
+{:ok, profile} = Medplum.userinfo(user_client)
+{:ok, patient} = Medplum.read(user_client, "Patient", "123")
+```
+
 ## Client options
 
 `Medplum.new/1` accepts:
 
 - `base_url` - Medplum server URL, trailing slash removed automatically
-- `client_id` - OAuth client id
-- `client_secret` - OAuth client secret
+- `client_id` - OAuth client id, required for `:client_credentials`
+- `client_secret` - OAuth client secret, required for `:client_credentials`
+- `auth_mode` - `:client_credentials` or `:access_token`, defaults based on config
+- `access_token` - existing bearer token for user-authenticated requests
 - `fhir_version` - defaults to `"R4"`
 - `default_headers` - merged into every request
 - `req_options` - forwarded to `Req`
@@ -109,10 +158,24 @@ client =
   )
 ```
 
+Use `Medplum.new_with_access_token/2` to build an access-token client directly:
+
+```elixir
+user_client =
+  Medplum.new_with_access_token(
+    [base_url: System.fetch_env!("MEDPLUM_BASE_URL")],
+    user_access_token
+  )
+```
+
 ## Core API
 
 Main module covers generic FHIR and Medplum operations:
 
+- `authorize_url/2`
+- `exchange_authorization_code/3`
+- `userinfo/2`
+- `new_with_access_token/2`
 - `read/3`
 - `search/3`
 - `create/3`
@@ -120,6 +183,7 @@ Main module covers generic FHIR and Medplum operations:
 - `delete/3`
 - `patch/4`
 - `request/4`
+- `api_request/4`
 - `operation/5`
 - `poll_async/3`
 - `batch/2`
@@ -140,6 +204,9 @@ Example:
 
 {:ok, graphql_result} =
   Medplum.graphql(client, "query Demo { PatientList { id } }")
+
+{:ok, userinfo} =
+  Medplum.userinfo(user_client)
 ```
 
 ## Resource helpers
@@ -297,7 +364,7 @@ config :my_app, :medplum,
 ```
 
 ```elixir
-client =
+service_client =
   :my_app
   |> Application.fetch_env!(:medplum)
   |> Medplum.new()

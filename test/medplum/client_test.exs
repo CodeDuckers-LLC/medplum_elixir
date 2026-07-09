@@ -18,6 +18,8 @@ defmodule Medplum.ClientTest do
     assert client.default_headers == []
     assert client.req_options == []
     assert client.auth_req_options == []
+    assert client.auth_mode == :client_credentials
+    assert client.access_token == nil
     assert client.retry == :transient
     assert client.max_retries == 2
     assert client.token_refresh_skew == 60
@@ -34,6 +36,7 @@ defmodule Medplum.ClientTest do
         default_headers: [{"x-app", "demo"}],
         req_options: [receive_timeout: 5_000],
         auth_req_options: [connect_options: [timeout: 100]],
+        auth_mode: :client_credentials,
         retry: false,
         max_retries: 0,
         token_refresh_skew: 5,
@@ -45,10 +48,26 @@ defmodule Medplum.ClientTest do
     assert client.default_headers == [{"x-app", "demo"}]
     assert client.req_options == [receive_timeout: 5_000]
     assert client.auth_req_options == [connect_options: [timeout: 100]]
+    assert client.auth_mode == :client_credentials
     assert client.retry == false
     assert client.max_retries == 0
     assert client.token_refresh_skew == 5
     assert client.cache_tokens == false
+  end
+
+  test "new_with_access_token/2 builds an access-token client" do
+    client =
+      Client.new_with_access_token(
+        [base_url: "https://api.medplum.com/", default_headers: [{"x-app", "demo"}]],
+        "user-token"
+      )
+
+    assert client.base_url == "https://api.medplum.com"
+    assert client.auth_mode == :access_token
+    assert client.access_token == "user-token"
+    assert client.client_id == ""
+    assert client.client_secret == ""
+    assert client.default_headers == [{"x-app", "demo"}]
   end
 
   test "new!/1 raises for unsupported options" do
@@ -69,6 +88,15 @@ defmodule Medplum.ClientTest do
         client_id: "id",
         client_secret: "secret",
         max_retries: -1
+      )
+    end
+  end
+
+  test "new/1 raises when access-token mode is missing the token" do
+    assert_raise ArgumentError, ~r/:access_token must be a non-empty string/, fn ->
+      Client.new(
+        base_url: "https://api.medplum.com",
+        auth_mode: :access_token
       )
     end
   end

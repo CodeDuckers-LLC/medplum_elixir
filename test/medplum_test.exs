@@ -154,6 +154,99 @@ defmodule MedplumTest do
     assert_received {:absolute_request, ^url}
   end
 
+  test "api_request/4 sends authenticated requests relative to base_url" do
+    parent = self()
+
+    adapter = fn request ->
+      if request.url.path != "/oauth2/token" do
+        send(parent, {:api_request, request})
+      end
+
+      response =
+        case request.url.path do
+          "/oauth2/token" ->
+            Req.Response.new(
+              status: 200,
+              body: %{"access_token" => "token-1", "expires_in" => 300}
+            )
+
+          "/admin/projects" ->
+            Req.Response.new(status: 200, body: %{"projects" => [%{"id" => "project-1"}]})
+        end
+
+      {request, response}
+    end
+
+    client = client(adapter: adapter)
+
+    assert {:ok, %{"projects" => [%{"id" => "project-1"}]}} =
+             Medplum.api_request(client, :get, "/admin/projects")
+
+    assert_received {:api_request, %Req.Request{} = request}
+    assert request.url.path == "/admin/projects"
+  end
+
+  test "requests with a provided access token skip client-credentials exchange" do
+    parent = self()
+
+    adapter = fn request ->
+      send(parent, {:access_token_request, request})
+
+      response =
+        case request.url.path do
+          "/fhir/R4/Patient/123" ->
+            Req.Response.new(status: 200, body: %{"resourceType" => "Patient", "id" => "123"})
+
+          other ->
+            flunk("unexpected request to #{other}")
+        end
+
+      {request, response}
+    end
+
+    client =
+      Medplum.new_with_access_token(
+        [base_url: "https://api.medplum.com", req_options: [adapter: adapter]],
+        "user-access-token"
+      )
+
+    assert {:ok, %{"id" => "123"}} = Medplum.read(client, "Patient", "123")
+
+    assert_received {:access_token_request, %Req.Request{} = request}
+    assert request.url.path == "/fhir/R4/Patient/123"
+    assert Req.Request.get_header(request, "authorization") == ["Bearer user-access-token"]
+  end
+
+  test "client-credentials requests still fetch a token by default" do
+    parent = self()
+
+    adapter = fn request ->
+      send(parent, {:default_auth_request, URI.to_string(request.url)})
+
+      response =
+        case request.url.path do
+          "/oauth2/token" ->
+            Req.Response.new(
+              status: 200,
+              body: %{"access_token" => "token-default", "expires_in" => 300}
+            )
+
+          "/fhir/R4/Patient/123" ->
+            Req.Response.new(status: 200, body: %{"resourceType" => "Patient", "id" => "123"})
+        end
+
+      {request, response}
+    end
+
+    client = client(adapter: adapter)
+
+    assert {:ok, %{"id" => "123"}} = Medplum.read(client, "Patient", "123")
+
+    urls = drain_default_auth_urls([])
+    assert "https://api.medplum.com/oauth2/token" in urls
+    assert "https://api.medplum.com/fhir/R4/Patient/123" in urls
+  end
+
   test "operation/5 builds system operation path and defaults to POST with Parameters body" do
     parent = self()
 
@@ -618,6 +711,14 @@ defmodule MedplumTest do
   defp drain_poll_urls(acc) do
     receive do
       {:poll_request, url} -> drain_poll_urls([url | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
+  defp drain_default_auth_urls(acc) do
+    receive do
+      {:default_auth_request, url} -> drain_default_auth_urls([url | acc])
     after
       0 -> Enum.reverse(acc)
     end

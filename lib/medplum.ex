@@ -1,13 +1,14 @@
 defmodule Medplum do
   @moduledoc """
-  Concise client for Medplum's FHIR API.
+  Concise client for Medplum's FHIR API and OAuth flows.
 
   Build a `Medplum.Client`, then pass it to the resource helpers in this module for
   authenticated FHIR requests. Public operations return `{:ok, map()}` for decoded
   response bodies or `{:error, %Medplum.Error{}}` for transport, auth, or API failures.
 
-  Clients reuse cached OAuth tokens by default, accept shared `Req` options, and expose
-  both resource helpers and lower-level request functions for unsupported endpoints.
+  Clients can either reuse cached client-credentials tokens or use an existing bearer
+  token directly. The module exposes resource helpers, OAuth helpers, and lower-level
+  request functions for unsupported endpoints.
 
   ## Example
 
@@ -25,6 +26,7 @@ defmodule Medplum do
 
   alias Medplum.Client
   alias Medplum.Error
+  alias Medplum.OAuth
   alias Medplum.Request
 
   @type client :: Client.t()
@@ -50,6 +52,33 @@ defmodule Medplum do
   """
   @spec new!(keyword() | map()) :: Client.t()
   def new!(opts), do: Client.new!(opts)
+
+  @doc """
+  Builds a reusable Medplum client that authenticates with an existing bearer token.
+  """
+  @spec new_with_access_token(keyword() | map(), String.t()) :: Client.t()
+  def new_with_access_token(opts, access_token),
+    do: Client.new_with_access_token(opts, access_token)
+
+  @doc """
+  Builds a Medplum OAuth authorize URL for authorization-code flows.
+  """
+  @spec authorize_url(Client.t() | keyword() | map(), keyword() | map()) :: String.t()
+  def authorize_url(client_or_opts, params), do: OAuth.authorize_url(client_or_opts, params)
+
+  @doc """
+  Exchanges an authorization code for a Medplum OAuth token response.
+  """
+  @spec exchange_authorization_code(Client.t() | keyword() | map(), String.t(), keyword() | map()) ::
+          result()
+  def exchange_authorization_code(client_or_opts, code, opts \\ []),
+    do: OAuth.exchange_authorization_code(client_or_opts, code, opts)
+
+  @doc """
+  Fetches OpenID Connect userinfo from `/oauth2/userinfo`.
+  """
+  @spec userinfo(Client.t(), keyword()) :: result()
+  def userinfo(%Client{} = client, opts \\ []), do: OAuth.userinfo(client, opts)
 
   @doc """
   Fetches one FHIR resource by resource type and id.
@@ -104,6 +133,14 @@ defmodule Medplum do
   @spec request(Client.t(), atom(), String.t(), keyword()) :: result()
   def request(%Client{} = client, method, path, opts \\ []) do
     Request.request(client, method, path, opts)
+  end
+
+  @doc """
+  Sends an authenticated request to a non-FHIR Medplum path relative to `base_url`.
+  """
+  @spec api_request(Client.t(), atom(), String.t(), keyword()) :: result()
+  def api_request(%Client{} = client, method, path, opts \\ []) do
+    Request.api_request(client, method, path, opts)
   end
 
   @doc """
