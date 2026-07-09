@@ -20,7 +20,7 @@ Add package to `mix.exs`:
 ```elixir
 def deps do
   [
-    {:medplum_elixir, "~> 0.2.0"}
+    {:medplum_elixir, "~> 0.3.0"}
   ]
 end
 ```
